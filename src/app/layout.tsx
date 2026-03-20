@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI 简历评估与 JD 拆解助手 | VibeMatch AI",
+  title: "AI简历评估与JD拆解助手 | VibeMatch AI",
   description:
     "消除招聘信息差，精准量化你的竞争力，获取定制化面试突击指南。",
 };

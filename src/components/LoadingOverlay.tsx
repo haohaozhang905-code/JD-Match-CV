@@ -1,17 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
-import type { ProgressStep } from "@/types/progress";
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import { Info, Check, Loader2 } from "lucide-react";
 import { PROGRESS_LABELS, PROGRESS_ORDER } from "@/types/progress";
-import { Sparkles } from "lucide-react";
+import type { ProgressStep } from "@/types/progress";
 
 interface LoadingOverlayProps {
   isActive: boolean;
   step?: ProgressStep | null;
+  thinkingText?: string;
+  enableThinking?: boolean;
 }
 
-export function LoadingOverlay({ isActive, step }: LoadingOverlayProps) {
-  const stepIndex = step ? PROGRESS_ORDER.indexOf(step) : 0;
+export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }: LoadingOverlayProps) {
+  const thinkingRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (thinkingText && thinkingRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, [thinkingText]);
 
   useEffect(() => {
     if (isActive) {
@@ -29,39 +40,153 @@ export function LoadingOverlay({ isActive, step }: LoadingOverlayProps) {
 
   if (!isActive) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#F8F9FB]">
-      <div className="flex flex-col items-center gap-8">
-        {/* 中心：蓝色圆 + 白色 sparkle 图标，带柔和阴影 */}
-        <div className="relative flex items-center justify-center">
-          <div className="absolute size-32 rounded-full border border-[#E0E7FF]/60 animate-loading-pulse-1" />
-          <div className="absolute size-24 rounded-full border border-[#C7D2FE]/50 animate-loading-pulse-2" />
-          <div className="relative flex size-16 items-center justify-center rounded-full bg-[#3B82F6] shadow-[0_4px_14px_rgba(59,130,246,0.4)]">
-            <Sparkles className="size-8 text-white" />
+  const stepIndex = step ? PROGRESS_ORDER.indexOf(step) : 0;
+
+  // 深度思考模式：背景高斯模糊 + 弹框毛玻璃 + 阴影
+  if (enableThinking) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-6"
+        style={{
+          backgroundColor: "rgba(248, 250, 252, 0.6)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        }}
+      >
+        <div
+          className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
+          style={{
+            backdropFilter: "blur(24px) saturate(150%)",
+            backgroundColor: "rgba(255, 255, 255, 0.72)",
+            border: "1px solid rgba(255, 255, 255, 0.9)",
+            boxShadow:
+              "0 0 0 1px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.05), 0 12px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.08)",
+          }}
+        >
+          {/* 头部 */}
+          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#eff6ff]">
+                <Info className="size-5 text-[#155dfc]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#101828]">深度思考模式已开启</p>
+                <p className="text-xs text-[#6a7282]">正在进行高维逻辑推演...</p>
+              </div>
+            </div>
+          </div>
+          {/* 思考过程 */}
+          <div className="min-h-[280px] p-6">
+            <div
+              ref={thinkingRef}
+              className="max-h-[420px] overflow-y-auto overflow-x-hidden text-sm leading-[1.7] text-[#374151]"
+            >
+              {thinkingText ? (
+                <div className="font-mono break-words [&_strong]:font-semibold [&_strong]:text-[#101828] [&_em]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkBreaks]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-[#101828]">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                      ul: ({ children }) => <ul className="list-disc list-inside my-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside my-1">{children}</ol>,
+                      li: ({ children }) => <li className="my-0.5">{children}</li>,
+                    }}
+                  >
+                    {thinkingText}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="font-mono text-[#9ca3af]">等待AI开始思考...</div>
+              )}
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-[#9ca3af]">
+              <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-gray-200 border-t-[#155dfc]" />
+              <span className="text-sm font-mono">推理中...</span>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="flex flex-col items-center gap-2 text-center">
-          <p className="text-xl font-bold text-[#1e293b]">
-            {step ? PROGRESS_LABELS[step] : "处理中..."}
-          </p>
-          <p className="flex items-center justify-center gap-2 text-sm text-[#6a7282]">
-            <span className="size-4 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#3B82F6]" />
-            正在深度思考中...
-          </p>
-        </div>
-
-        {/* 进度圆点 - 动态闪烁 */}
-        <div className="flex gap-2.5">
-          {PROGRESS_ORDER.map((_, i) => (
-            <div
-              key={i}
-              className={`size-2.5 rounded-full animate-dot-blink ${
-                i <= stepIndex ? "bg-[#3B82F6]" : "bg-gray-300"
-              }`}
-              style={{ animationDelay: `${i * 0.15}s` }}
-            />
-          ))}
+  // 普通模式：背景高斯模糊 + 弹框毛玻璃 + 阴影
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{
+        backgroundColor: "rgba(248, 250, 252, 0.6)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+      }}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-2xl px-8 py-10"
+        style={{
+          backdropFilter: "blur(24px) saturate(150%)",
+          backgroundColor: "rgba(255, 255, 255, 0.72)",
+          border: "1px solid rgba(255, 255, 255, 0.9)",
+          boxShadow:
+            "0 0 0 1px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.05), 0 12px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.08)",
+        }}
+      >
+        {/* 动态时间轴 */}
+        <div className="space-y-0">
+          {PROGRESS_ORDER.map((s, i) => {
+            const status = i < stepIndex ? "completed" : i === stepIndex ? "active" : "pending";
+            return (
+              <div key={s} className="flex items-start gap-4">
+                <div className="flex flex-col items-center">
+                  {/* 节点图标 */}
+                  <div className="flex size-8 shrink-0 items-center justify-center">
+                    {status === "completed" && (
+                      <motion.div
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: [0.5, 1.2, 1] }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="flex size-6 items-center justify-center rounded-full bg-[#22c55e]"
+                      >
+                        <Check className="size-4 text-white" strokeWidth={3} />
+                      </motion.div>
+                    )}
+                    {status === "active" && (
+                      <div className="flex size-6 items-center justify-center">
+                        <Loader2 className="size-5 animate-spin text-[#3B82F6]" />
+                      </div>
+                    )}
+                    {status === "pending" && (
+                      <div className="size-2 rounded-full bg-gray-300 opacity-40" />
+                    )}
+                  </div>
+                  {/* 连接线 */}
+                  {i < PROGRESS_ORDER.length - 1 && (
+                    <div className="relative mt-1 h-8 w-px overflow-hidden bg-gray-200">
+                      <motion.div
+                        initial={{ scaleY: 0 }}
+                        animate={{ scaleY: i < stepIndex ? 1 : 0 }}
+                        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                        className="absolute inset-x-0 top-0 h-full origin-top bg-[#22c55e]"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex min-h-8 flex-1 items-center">
+                  <p
+                    className={`m-0 text-sm leading-normal transition-colors ${
+                      status === "active"
+                        ? "font-medium text-[#111827]"
+                        : status === "completed"
+                          ? "text-[#6b7280]"
+                          : "text-gray-400"
+                    }`}
+                  >
+                    {PROGRESS_LABELS[s]}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

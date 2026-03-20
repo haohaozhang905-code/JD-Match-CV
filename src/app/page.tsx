@@ -1,14 +1,26 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { InputStep } from "@/components/InputStep";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { ResultDashboard } from "@/components/ResultDashboard";
-import { ApiKeyDialog, getStoredApiKey } from "@/components/ApiKeyDialog";
+import { ApiKeyDialog, getStoredApiKey, getStoredThinkingMode } from "@/components/ApiKeyDialog";
 import type { AnalysisResult } from "@/types/analysis";
 import type { ProgressStep } from "@/types/progress";
+
+const MIN_LOADING_DURATION_MS = 2500;
+const MAX_RETRIES = 3;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isRetryable(e: unknown): boolean {
+  const err = e as { retryable?: boolean };
+  return err?.retryable !== false;
+}
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +28,9 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [thinkingText, setThinkingText] = useState("");
+  const [enableThinking, setEnableThinking] = useState(false);
+  const loadingStartRef = useRef<number>(0);
 
   const handleAnalyze = useCallback(
     async (getData: () => Promise<{ jd: string; resume: string }>) => {
@@ -26,71 +41,150 @@ export default function Home() {
       }
 
       setIsLoading(true);
+      loadingStartRef.current = Date.now();
       setProgressStep("parsing_jd");
       setResult(null);
+      setThinkingText("");
+      const thinkingMode = getStoredThinkingMode();
+      setEnableThinking(thinkingMode);
 
       let progressTimer: ReturnType<typeof setInterval> | undefined;
+      let lastError: Error | null = null;
 
       try {
-        const { jd, resume } = await getData();
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          if (attempt > 0) {
+            if (progressTimer) clearInterval(progressTimer);
+            progressTimer = undefined;
+            setThinkingText("");
+            setProgressStep("parsing_jd");
+            await sleep(1000 * attempt);
+          }
 
-        setProgressStep("parsing_resume");
-        await new Promise((r) => setTimeout(r, 100));
+          const { jd, resume } = await getData();
 
-        setProgressStep("analyzing_match");
+          setProgressStep("parsing_resume");
+          await new Promise((r) => setTimeout(r, 100));
 
-        progressTimer = setInterval(() => {
-          setProgressStep((s) => {
-            const steps: ProgressStep[] = ["analyzing_match", "translating_jd", "generating_questions"];
-            const idx = steps.indexOf(s || "analyzing_match");
-            return idx < 2 ? steps[idx + 1] : s;
+          setProgressStep("analyzing_match");
+
+          progressTimer = setInterval(() => {
+            setProgressStep((s) => {
+              const steps: ProgressStep[] = ["analyzing_match", "translating_jd", "generating_questions"];
+              const idx = steps.indexOf(s || "analyzing_match");
+              return idx < 2 ? steps[idx + 1] : s;
+            });
+          }, 4000);
+
+          const res = await fetch("/api/analyze-stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jd, resume, apiKey: key, enableThinking: thinkingMode }),
           });
-        }, 4000);
 
-        const res = await fetch("/api/analyze-stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jd, resume, apiKey: key }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "分析失败");
-        }
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const apiError = new Error(err.error || "分析失败") as Error & { retryable?: boolean };
+            apiError.retryable = res.status >= 500 || res.status === 429;
+            throw apiError;
+          }
 
         const reader = res.body?.getReader();
         if (!reader) throw new Error("无法读取响应");
 
         const decoder = new TextDecoder();
-        let fullBuffer = "";
+        let contentBuffer = "";
+        let lineBuffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          fullBuffer += decoder.decode(value, { stream: true });
+          lineBuffer += decoder.decode(value, { stream: true });
+          const lines = lineBuffer.split("\n");
+          lineBuffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.type === "reasoning" && parsed.content) {
+                setThinkingText((prev) => prev + parsed.content);
+                await new Promise((r) => setTimeout(r, 0));
+              } else if (parsed.type === "content" && parsed.content) {
+                contentBuffer += parsed.content;
+              }
+            } catch {
+              // 非 JSON 行，忽略
+            }
+          }
         }
 
-        const jsonMatch = fullBuffer.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : fullBuffer.trim();
+        if (lineBuffer.trim()) {
+          try {
+            const parsed = JSON.parse(lineBuffer);
+            if (parsed.type === "reasoning" && parsed.content) {
+              setThinkingText((prev) => prev + parsed.content);
+            } else if (parsed.type === "content" && parsed.content) {
+              contentBuffer += parsed.content;
+            }
+          } catch {
+            // 忽略
+          }
+        }
+
+        // 提取 JSON：支持纯 JSON、或 ```json ... ``` 包裹
+        let jsonStr = contentBuffer.trim();
+        const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          jsonStr = codeBlockMatch[1].trim();
+        } else {
+          const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+          jsonStr = jsonMatch ? jsonMatch[0] : jsonStr;
+        }
+
         if (!jsonStr) throw new Error("未能解析分析结果，请检查 API Key 或重试");
 
         try {
-          const parsed = JSON.parse(jsonStr) as AnalysisResult;
-          if (typeof parsed.matchScore === "number") {
-            setResult(parsed);
+          const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+          let score = parsed.matchScore ?? parsed.match_score;
+          if (typeof score === "string") {
+            const n = Number(score);
+            score = Number.isFinite(n) ? n : undefined;
+          }
+          if (typeof score === "number" && score >= 0 && score <= 100) {
+            const elapsed = Date.now() - loadingStartRef.current;
+            const remaining = Math.max(0, MIN_LOADING_DURATION_MS - elapsed);
+            await new Promise((r) => setTimeout(r, remaining));
+            setProgressStep("generating_questions");
+            await new Promise((r) => setTimeout(r, 200));
+            setResult({ ...parsed, matchScore: score } as AnalysisResult);
             window.scrollTo(0, 0);
+            break;
           } else {
             throw new Error("分析结果格式异常");
           }
-        } catch {
-          throw new Error("未能解析分析结果，请检查 API Key 或重试");
+        } catch (parseErr) {
+          if (parseErr instanceof SyntaxError) {
+            throw new Error("未能解析分析结果，请检查 API Key 或重试");
+          }
+          throw parseErr;
         }
         } catch (e) {
-        alert(e instanceof Error ? e.message : "分析失败，请稍后重试");
+          lastError = e instanceof Error ? e : new Error(String(e));
+          if (!isRetryable(e) || attempt >= MAX_RETRIES) break;
+        }
+      }
+
+      if (lastError) {
+        alert(lastError instanceof Error ? lastError.message : "分析失败，请稍后重试");
+      }
       } finally {
         if (progressTimer) clearInterval(progressTimer);
         setIsLoading(false);
         setProgressStep(null);
+        setThinkingText("");
+        setEnableThinking(false);
       }
     },
     [apiKey]
@@ -101,7 +195,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-[#F8FAFC]">
       <Header onOpenApiKey={() => setApiKeyDialogOpen(true)} />
-      <main className="flex-1 px-6 py-12">
+      <main className="flex-1 px-6 pt-[35px] pb-12">
         <div className="mx-auto flex max-w-6xl justify-center">
           {result ? (
             <ResultDashboard result={result} onBack={handleBack} />
@@ -115,7 +209,12 @@ export default function Home() {
         </div>
       </main>
       <Footer />
-      <LoadingOverlay isActive={isLoading} step={progressStep} />
+      <LoadingOverlay
+        isActive={isLoading}
+        step={progressStep}
+        thinkingText={thinkingText}
+        enableThinking={enableThinking}
+      />
       <ApiKeyDialog
         open={apiKeyDialogOpen}
         onOpenChange={setApiKeyDialogOpen}

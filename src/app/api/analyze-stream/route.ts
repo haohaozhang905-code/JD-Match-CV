@@ -1,12 +1,27 @@
 import { NextRequest } from "next/server";
 
 const QWEN_API = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+const MAX_RETRIES = 3;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 /**
  * 流式分析 API - 使用 Qwen 模型，支持流式输出
+ * 大模型调用失败时最多重试 3 次
  */
 export async function POST(request: NextRequest) {
-  const { jd, resume, apiKey } = await request.json();
+  let body: { jd?: string; resume?: string; apiKey?: string; enableThinking?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "请求体格式错误，请检查输入" }),
+      { status: 400 }
+    );
+  }
+  const { jd, resume, apiKey, enableThinking } = body;
 
   if (!jd || !resume) {
     return new Response(
@@ -24,107 +39,166 @@ export async function POST(request: NextRequest) {
 
   const encoder = new TextEncoder();
 
-  const systemPrompt = `你是一个专业的简历与 JD 匹配分析助手。请根据用户提供的 JD 和简历，输出结构化的 JSON 分析结果。
+  const systemPrompt = `【角色设定】
+你是一名拥有10年大厂经验的顶级资深业务线面试官。你的风格是：极其毒舌、一针见血、心狠手辣、拒绝任何职场鸡汤和废话。你审视候选人就像在拿着放大镜挑刺，能瞬间扒掉候选人简历上的虚假包装，也能一眼看穿JD（职位描述）背后的真实资本家潜台词。
 
-必须严格按以下 JSON 格式输出，不要包含其他文字：
+【任务目标】
+深度对比候选人「简历」与「目标职位JD」，产出一份极其专业、残酷、直戳痛点的评估报告。
+
+【最高约束规则】（违背任何一条将导致系统崩溃，你必须绝对服从）
+1. 语言红线：全程必须100%使用简体中文思考和回复，禁止任何英文单词（除非JD和简历原有的专有名词）。
+2. 格式红线：必须且只能输出一个合法的JSON对象。绝对禁止包含任何Markdown代码块标记、前置问候语、后置解释说明。
+3. 符号红线：为保证JSON解析不报错，JSON的Key和Value外层使用标准英文双引号 "。但在Value的文本内容中，绝对禁止使用任何中英文的双引号（" 或 “ ”）和单引号（' 或 ‘ ’），遇到需要引用的地方，强制全部替换为直角引号「」。
+4. 强调规则：Value文本内部允许且鼓励使用Markdown加粗语法来突出重点。
+
+【评估与打分准则】
+打分极其严苛：核心硬性技能匹配度（60%权重）、业务场景经验匹配度（30%权重）、软素质潜台词（10%权重）。如果缺失JD核心要求，直接打不及格，绝不和稀泥。
+
+【强制输出结构】（必须严格遵守此JSON Schema，不要增减Key）
 {
-  "matchScore": 0-100 的整数,
-  "matchSummary": "一句话总结匹配度及建议",
+  "matchScore": "在这里输出0-100的整数，评分要残忍客观",
+  "matchSummary": "一针见血的总体评价。要求语气毒舌犀利，一刀致命。例如：「核心硬技能高度匹配，但缺乏主导大型项目的落地经验，大概率是个只会写PPT的螺丝钉，面试需重点防守履历单薄的质疑。」",
   "jdTranslations": [
-    { "original": "JD 原文摘录", "translation": "大白话翻译" }
+    {
+      "original": "提取JD中那些看似高大上或模糊的招聘黑话",
+      "translation": "翻译成极其真实、接地气的大白话和企业真实的用人潜台词（如「抗压能力强」=「常态化无偿加班，PUA高发区，准备好速效救心丸」）"
+    }
   ],
-  "strengths": ["核心优势1", "核心优势2", ...],
-  "weaknesses": ["核心短板1", "核心短板2", ...],
+  "strengths": [
+    "说明简历中哪一项具体经历完美命中了JD的哪一条核心要求，用词要专业，别吹捧，客观说明即可。"
+  ],
+  "weaknesses": [
+    "毫不留情地扒皮。指出简历中缺失了JD要求的哪些核心能力，哪些经历与JD存在错配，或者哪些数据看起来像在注水。"
+  ],
   "interviewQuestions": [
-    { "question": "面试题", "suggestion": "回答思路与建议话术" }
+    {
+      "question": "针对weaknesses列表中的致命短板，设计具有极强压迫感的真实面试场景题或连环追问，要求直戳死穴。",
+      "suggestion": "提供高情商的「求生策略」。采用STAR法则（情境、任务、行动、结果）给出具体、能扬长避短的话术框架，教候选人如何体面地把坑填上。"
+    }
   ]
 }
 
-要求：
-- jdTranslations 至少 2 条，选取 JD 中的招聘黑话进行翻译
-- strengths 和 weaknesses 各 2-5 条
-- interviewQuestions 3-5 道，针对短板设计
-- 全部使用中文`;
+【数量限制】
+- jdTranslations：不限
+- strengths：不限
+- weaknesses：不限
+- interviewQuestions：不限（必须极具针对性和实战价值）
+- 语言：全部使用简体中文`;
 
   const userPrompt = `## 目标职位 JD\n\n${jd}\n\n## 我的简历\n\n${resume}`;
 
-  try {
-    const res = await fetch(QWEN_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "qwen-plus",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        stream: true,
-        temperature: 0.7,
-      }),
-    });
+  const requestBody = {
+    model: "qwen-plus",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    stream: true,
+    temperature: 0.5,
+    ...(enableThinking === true && { enable_thinking: true }),
+  };
 
-    if (!res.ok) {
-      const err = await res.text();
-      return new Response(
-        JSON.stringify({ error: `API 调用失败: ${err}` }),
-        { status: 502 }
-      );
-    }
+  let lastError: string | null = null;
 
-    const reader = res.body?.getReader();
-    if (!reader) {
-      return new Response(
-        JSON.stringify({ error: "无法读取响应流" }),
-        { status: 500 }
-      );
-    }
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(QWEN_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const decoder = new TextDecoder();
-        let buffer = "";
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6);
-                if (data === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content;
-                  if (content) {
-                    controller.enqueue(encoder.encode(content));
+      if (res.ok) {
+        const reader = res.body?.getReader();
+        if (!reader) {
+          lastError = "无法读取响应流";
+          if (attempt < MAX_RETRIES) {
+            await sleep(1000 * (attempt + 1));
+            continue;
+          }
+          return new Response(
+            JSON.stringify({ error: lastError }),
+            { status: 500 }
+          );
+        }
+
+        const stream = new ReadableStream({
+          async start(controller) {
+            const decoder = new TextDecoder();
+            let buffer = "";
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    const data = line.slice(6);
+                    if (data === "[DONE]") continue;
+                    try {
+                      const parsed = JSON.parse(data);
+                      const delta = parsed.choices?.[0]?.delta;
+                      if (!delta) continue;
+                      if (enableThinking && delta.reasoning_content) {
+                        controller.enqueue(
+                          encoder.encode(JSON.stringify({ type: "reasoning", content: delta.reasoning_content }) + "\n")
+                        );
+                      }
+                      if (delta.content) {
+                        controller.enqueue(
+                          encoder.encode(JSON.stringify({ type: "content", content: delta.content }) + "\n")
+                        );
+                      }
+                    } catch {
+                      // 忽略解析错误
+                    }
                   }
-                } catch {
-                  // 忽略解析错误
                 }
               }
+            } finally {
+              controller.close();
             }
-          }
-          if (buffer) controller.enqueue(encoder.encode(buffer));
-        } finally {
-          controller.close();
-        }
-      },
-    });
+          },
+        });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "分析失败";
-    return new Response(JSON.stringify({ error: msg }), { status: 500 });
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
+
+      const err = await res.text();
+      lastError = err;
+      const isRetryable = res.status >= 500 || res.status === 429;
+      if (!isRetryable || attempt >= MAX_RETRIES) {
+        return new Response(
+          JSON.stringify({ error: `API 调用失败: ${err}` }),
+          { status: res.status >= 500 ? 502 : res.status }
+        );
+      }
+      await sleep(1000 * (attempt + 1));
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "分析失败";
+      if (attempt >= MAX_RETRIES) {
+        return new Response(
+          JSON.stringify({ error: lastError }),
+          { status: 500 }
+        );
+      }
+      await sleep(1000 * (attempt + 1));
+    }
   }
+
+  return new Response(
+    JSON.stringify({ error: lastError || "分析失败" }),
+    { status: 500 }
+  );
 }

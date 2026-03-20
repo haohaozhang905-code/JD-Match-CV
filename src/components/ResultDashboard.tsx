@@ -8,6 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { MarkdownBold } from "@/components/MarkdownBold";
 import { useCountUp } from "@/hooks/useCountUp";
 import type { AnalysisResult } from "@/types/analysis";
 
@@ -39,14 +40,16 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
 
   const handleExportPdf = () => window.print();
 
+  const cardShadow = "0px 8px 30px 0px rgba(0,0,0,0.04)";
+
   return (
-    <div className="w-full max-w-4xl space-y-6">
+    <div className="w-full max-w-4xl space-y-8">
       {/* 顶部操作栏 */}
-      <div className="flex items-center justify-between">
+      <div className="flex h-[38px] items-center justify-between px-0 print:hidden">
         <Button
           variant="ghost"
           onClick={onBack}
-          className="gap-2 text-[#6a7282] hover:text-[#101828] print:hidden"
+          className="h-auto gap-2 px-0 text-[14px] text-[#6a7282] hover:bg-transparent hover:text-[#101828]"
         >
           <ArrowLeft className="size-4" />
           重新分析
@@ -54,50 +57,33 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
         <Button
           variant="outline"
           onClick={handleExportPdf}
-          className="gap-2 print:hidden"
+          className="h-[38px] gap-2 rounded-[10px] border-[#e5e7eb] px-4 text-[14px] font-medium text-[#364153] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-gray-50"
         >
           <FileDown className="size-4" />
           导出 PDF 报告
         </Button>
       </div>
 
-      {/* 板块一：综合匹配度 - 设计稿：蓝色靶心图标、绿色分段环形、极度吻合绿色 */}
+      {/* 板块一：综合匹配度 - 左右布局，设计稿：饱和绿、加粗字 */}
       <div
-        className="overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
-        style={{ boxShadow: "0px 4px 24px 0px rgba(0,0,0,0.04)" }}
+        className="relative overflow-hidden rounded-[24px] border border-[#f3f4f6] bg-white p-8"
+        style={{ boxShadow: cardShadow }}
       >
-        <h2 className="mb-8 flex items-center gap-2 text-xl font-bold text-[#101828]">
-          <Target className="size-5 text-[#155dfc]" />
+        <h2 className="relative mb-6 flex items-center gap-2 text-[20px] font-bold text-[#1A1A1A]">
+          <Target className="size-5 shrink-0 text-[#155dfc]" />
           综合匹配度
         </h2>
-        <div className="flex flex-col items-center gap-6 pt-4 pb-8">
-          <div className="relative size-52">
+        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-10">
+          {/* 左侧：环形进度 - 鲜亮草绿 #22c55e */}
+          <div className="relative shrink-0 size-40 md:size-44">
             <svg className="size-full -rotate-90" viewBox="0 0 100 100">
-              {/* 内圈：浅灰细线 */}
-              <circle
-                cx="50"
-                cy="50"
-                r="38"
-                fill="none"
-                stroke="#e5e7eb"
-                strokeWidth="2"
-              />
-              {/* 外圈：浅灰背景轨道 */}
+              <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e7eb" strokeWidth="10" />
               <circle
                 cx="50"
                 cy="50"
                 r="42"
                 fill="none"
-                stroke="#e5e7eb"
-                strokeWidth="10"
-              />
-              {/* 外圈：亮绿色分段进度条 */}
-              <circle
-                cx="50"
-                cy="50"
-                r="42"
-                fill="none"
-                stroke="#00C853"
+                stroke="#22c55e"
                 strokeWidth="10"
                 strokeDasharray={`${(animatedScore / 100) * 264} 264`}
                 strokeLinecap="round"
@@ -105,56 +91,57 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
               />
             </svg>
             <span className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[48px] font-bold leading-none text-[#101828]">
+              <span className="text-[40px] font-extrabold leading-none text-[#1A1A1A]">
                 {animatedScore}
-                <span className="ml-0.5 text-2xl font-medium text-[#9ca3af]">%</span>
+                <span className="ml-0.5 text-base font-medium text-[#555555]">%</span>
               </span>
-              <span className="mt-2 text-base font-medium text-[#00C853]">
+              <span className="mt-1.5 text-[13px] font-bold text-[#22c55e]">
                 {getMatchLevel(r.matchScore)}
               </span>
             </span>
           </div>
-          <p className="max-w-md text-center text-[15px] leading-6 text-[#6a7282]">
-            {r.matchSummary}
+          {/* 右侧：描述文案 - 深灰、加粗 */}
+          <p className="flex-1 text-[14px] font-medium leading-[22px] text-[#555555] md:pl-2">
+            <MarkdownBold text={r.matchSummary} />
           </p>
         </div>
       </div>
 
-      {/* 板块二：JD 黑话翻译器 - 设计稿：紫色图标、左灰右紫框 */}
+      {/* 板块二：JD黑话翻译器 - 设计稿：紫色图标、左灰右紫框 */}
       {r.jdTranslations.length > 0 && (
         <div
-          className="overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
-          style={{ boxShadow: "0px 4px 24px 0px rgba(0,0,0,0.04)" }}
+          className="overflow-hidden rounded-[24px] border border-[#f3f4f6] bg-white p-8"
+          style={{ boxShadow: cardShadow }}
         >
-          <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-[#101828]">
-            <Sparkles className="size-5 text-[#9C27B0]" />
-            JD 黑话翻译器
+          <h2 className="mb-6 flex items-center gap-2 text-[20px] font-semibold text-[#101828]">
+            <Sparkles className="size-5 shrink-0 text-[#9C27B0]" />
+            JD黑话翻译器
           </h2>
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             {r.jdTranslations.map((item, i) => (
               <div
                 key={i}
                 className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr] md:items-stretch"
               >
-                {/* 左：JD 原文 - 浅灰背景 */}
-                <div className="rounded-xl bg-gray-50 p-4">
-                  <span className="mb-2 inline-block rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-[#6a7282]">
-                    JD 原文
+                {/* 左：JD原文 - 设计稿 bg-[#f9fafb] border-[#f3f4f6] */}
+                <div className="relative rounded-2xl border border-[#f3f4f6] bg-[#f9fafb] px-4 py-5">
+                  <span className="absolute -top-3 left-4 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#4a5565]" style={{ backgroundColor: "#e5e7eb" }}>
+                    JD原文
                   </span>
-                  <p className="text-sm leading-[22px] text-[#6a7282]">
-                    &quot;{item.original}&quot;
+                  <p className="text-[14px] leading-[22.75px] text-[#6a7282]">
+                    &quot;<MarkdownBold text={item.original} />&quot;
                   </p>
                 </div>
                 <div className="hidden items-center justify-center md:flex">
                   <ArrowRight className="size-5 shrink-0 text-[#9ca3af]" />
                 </div>
-                {/* 右：大白话潜台词 - 白底+淡紫边框 */}
-                <div className="rounded-xl border border-[#E1BEE7] bg-[#F8F5F9] p-4">
-                  <span className="mb-2 inline-block rounded-full bg-[#E1BEE7] px-2.5 py-0.5 text-xs font-medium text-[#7B1FA2]">
+                {/* 右：大白话潜台词 - 上下间距一致 py-5 */}
+                <div className="relative rounded-2xl border border-[#f3e8ff] px-4 py-5" style={{ backgroundColor: "rgba(250,245,255,0.5)" }}>
+                  <span className="absolute -top-3 left-4 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#8200db]" style={{ backgroundColor: "#e9d4ff" }}>
                     大白话潜台词
                   </span>
-                  <p className="text-sm leading-[22px] text-[#4A148C]">
-                    {item.translation}
+                  <p className="text-[14px] font-medium leading-[22.75px] text-[#59168b]">
+                    <MarkdownBold text={item.translation} />
                   </p>
                 </div>
               </div>
@@ -163,50 +150,58 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
         </div>
       )}
 
-      {/* 板块三：能力雷达与 Gap 分析 - 设计稿：紫色波浪图标、绿/红深色文字 */}
+      {/* 板块三：能力雷达与 Gap 分析 - 设计稿：绿 #016630 / 红 #9f0712 */}
       <div
-        className="overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
-        style={{ boxShadow: "0px 4px 24px 0px rgba(0,0,0,0.04)" }}
+        className="overflow-hidden rounded-[24px] border border-[#f3f4f6] bg-white p-8"
+        style={{ boxShadow: cardShadow }}
       >
-        <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-[#101828]">
-          <TrendingUp className="size-5 text-[#9C27B0]" />
+        <h2 className="mb-6 flex items-center gap-2 text-[20px] font-semibold text-[#101828]">
+          <TrendingUp className="size-5 shrink-0 text-[#9C27B0]" />
           能力雷达与 Gap 分析
         </h2>
         <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-green-800">
-              <div className="flex size-6 items-center justify-center rounded-full bg-green-100">
-                <Check className="size-3.5 text-green-600" />
+          {/* 核心优势 - 设计稿 bg rgba(240,253,244,0.5) border #dcfce7 */}
+          <div
+            className="rounded-2xl border border-[#dcfce7] p-6"
+            style={{ backgroundColor: "rgba(240,253,244,0.5)" }}
+          >
+            <h3 className="mb-4 flex items-center gap-2 text-[16px] font-semibold text-[#0d542b]">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#05df72]">
+                <Check className="size-4 text-white stroke-[3]" />
               </div>
               核心优势契合点
             </h3>
-            <ul className="space-y-3">
+            <ul className="flex flex-col gap-3">
               {r.strengths.map((s, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-sm leading-[22px] text-green-800"
+                  className="flex items-start gap-2 text-[14px] font-medium leading-[22.75px] text-[#016630]"
                 >
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-green-600" />
-                  {s}
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#05df72]" />
+                  <MarkdownBold text={s} />
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-red-800">
-              <div className="flex size-6 items-center justify-center rounded-full bg-red-100">
-                <X className="size-3.5 text-red-600" />
+          {/* 需警惕的核心短板 - 设计稿 bg rgba(254,242,242,0.5) border #ffe2e2 */}
+          <div
+            className="rounded-2xl border border-[#ffe2e2] p-6"
+            style={{ backgroundColor: "rgba(254,242,242,0.5)" }}
+          >
+            <h3 className="mb-4 flex items-center gap-2 text-[16px] font-semibold text-[#82181a]">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#ff6467]">
+                <X className="size-4 text-white stroke-[3]" />
               </div>
               需警惕的核心短板
             </h3>
-            <ul className="space-y-3">
+            <ul className="flex flex-col gap-3">
               {r.weaknesses.map((w, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-sm leading-[22px] text-red-800"
+                  className="flex items-start gap-2 text-[14px] font-medium leading-[22.75px] text-[#9f0712]"
                 >
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-red-600" />
-                  {w}
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#ff6467]" />
+                  <MarkdownBold text={w} />
                 </li>
               ))}
             </ul>
@@ -214,40 +209,46 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
         </div>
       </div>
 
-      {/* 板块四：定制化面试突击题库 - 设计稿：黄色闪电、蓝色展开态、气泡图标 */}
+      {/* 板块四：定制化面试突击题库 - 设计稿：展开 border #bedbff、内层白卡片 */}
       {r.interviewQuestions.length > 0 && (
         <div
-          className="overflow-hidden rounded-3xl border border-gray-100 bg-white p-8 shadow-[0px_4px_24px_0px_rgba(0,0,0,0.04)]"
-          style={{ boxShadow: "0px 4px 24px 0px rgba(0,0,0,0.04)" }}
+          className="overflow-hidden rounded-[24px] border border-[#f3f4f6] bg-white p-8"
+          style={{ boxShadow: cardShadow }}
         >
-          <h2 className="mb-2 flex items-center gap-2 text-xl font-bold text-[#101828]">
-            <Zap className="size-5 text-[#EAB308]" />
+          <h2 className="mb-2 flex items-center gap-2 text-[20px] font-semibold text-[#101828]">
+            <Zap className="size-5 shrink-0 text-[#EAB308]" />
             定制化面试突击题库
           </h2>
-          <p className="mb-6 text-sm text-[#6a7282]">
-            AI 结合你的简历短板与岗位核心诉求，预测出最可能被问到的 3 道高频面试题。
+          <p className="mb-6 text-[14px] text-[#6a7282]">
+            AI结合你的简历短板与岗位核心诉求，预测出最可能被问到的 3 道高频面试题。
           </p>
-          <Accordion className="w-full">
+          <Accordion className="flex w-full flex-col gap-4">
             {r.interviewQuestions.map((q, i) => (
               <AccordionItem
                 key={i}
                 value={`q-${i}`}
-                className="border border-blue-100 rounded-xl overflow-hidden mb-3 last:mb-0"
+                className="overflow-hidden rounded-2xl border border-[#f3f4f6] transition-colors data-open:border-[#bedbff] data-open:bg-[rgba(239,246,255,0.3)] data-open:shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)]"
               >
-                <AccordionTrigger className="flex items-start gap-3 px-5 py-5 text-left font-medium text-[#101828] bg-blue-50 hover:bg-blue-50 hover:no-underline [&[data-state=open]]:bg-blue-50">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded bg-[#155dfc]/20 text-xs font-semibold text-[#155dfc]">
-                    Q{i + 1}
-                  </span>
-                  <span className="text-sm font-medium flex-1">{q.question}</span>
+                <AccordionTrigger className="flex min-h-[52px] items-center justify-between gap-3 px-5 py-4 text-left hover:no-underline [&>svg]:size-5 [&>svg]:shrink-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#dbeafe] text-[12px] font-bold text-[#1447e6]">
+                      Q{i + 1}
+                    </span>
+                    <span className="text-[14px] font-medium leading-[1.5] text-[#101828]">
+                      <MarkdownBold text={q.question} />
+                    </span>
+                  </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="flex gap-3 rounded-b-xl bg-white px-5 pb-5 pt-2">
-                    <MessageCircle className="mt-0.5 size-5 shrink-0 text-[#155dfc]" />
-                    <div>
-                      <p className="text-sm leading-[22px] text-[#101828]">
-                        <span className="font-medium text-[#374151]">回答思路：</span>
-                        {q.suggestion}
-                      </p>
+                  <div className="border-t border-[rgba(219,234,254,0.5)] px-5 pb-2.5 pt-2">
+                    <div className="flex gap-3 rounded-[14px] border border-[#f3f4f6] bg-white p-4 shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_0px_rgba(0,0,0,0.1)]">
+                      <MessageCircle className="mt-0.5 size-5 shrink-0 text-[#155dfc]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] leading-[22.75px] text-[#4a5565]">
+                          <span className="font-medium text-[#374151]">回答思路：</span>
+                          <MarkdownBold text={q.suggestion} />
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </AccordionContent>

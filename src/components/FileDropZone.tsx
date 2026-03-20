@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { validateFileSize } from "@/lib/parse";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export function FileDropZone({
 }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
     (file: File) => {
@@ -79,17 +80,25 @@ export function FileDropZone({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       className={cn(
-        "relative flex min-h-[280px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors",
+        "relative flex h-full min-h-0 flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center transition-colors",
         isDragging && "border-[#155dfc] bg-[#eff6ff]/50",
         !isDragging && "border-gray-200 bg-gray-50/50",
         className
       )}
     >
       <input
+        ref={inputRef}
         type="file"
         accept={accept}
         onChange={onInputChange}
-        className="absolute inset-0 cursor-pointer opacity-0"
+        className="sr-only"
+        aria-hidden
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="absolute inset-0 cursor-pointer"
+        aria-label="选择文件"
       />
       {children || (
         <>

@@ -11,7 +11,7 @@ interface HeaderProps {
 export function Header({ onOpenApiKey }: HeaderProps) {
   return (
     <header className="border-b border-gray-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+      <div className="mx-auto flex h-[40px] max-w-6xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-lg bg-[#eff6ff]">
             <FileText className="size-5 text-[#155dfc]" />
