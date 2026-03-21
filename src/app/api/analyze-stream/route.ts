@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     ],
     stream: true,
     temperature: 0.5,
+    enable_search: true, // 联网搜索：模型可根据需要获取实时信息
     ...(enableThinking === true && { enable_thinking: true }),
   };
 

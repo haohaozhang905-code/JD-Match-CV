@@ -54,7 +54,7 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
   };
 
   return (
-    <div className="w-full max-w-4xl space-y-8">
+    <div className="mx-auto w-full max-w-4xl space-y-4">
       {/* 标题区 */}
       <div className="space-y-3 text-center">
         <h1 className="text-4xl font-semibold tracking-tight text-[#101828]">
@@ -211,7 +211,7 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
       </div>
 
       {/* 底部操作区 */}
-      <div className="flex flex-col items-center gap-6 pt-8">
+      <div className="flex flex-col items-center gap-3 pt-4">
         <Button
           size="lg"
           disabled={!canAnalyze || isLoading}
@@ -220,7 +220,7 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
             "h-[50px] rounded-full px-12 text-base font-semibold",
             canAnalyze && !isLoading
               ? "bg-[#155dfc] text-white hover:bg-[#1246c9]"
-              : "bg-gray-200 text-gray-500"
+              : "bg-[#155dfc]/90 text-white/90 cursor-not-allowed"
           )}
         >
           {isLoading ? (
@@ -232,22 +232,6 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
             </>
           )}
         </Button>
-        <div className="flex items-center gap-2 text-xs text-[#99a1af]">
-          <svg
-            className="size-4 shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          <span>您的简历仅用于本次单次匹配分析，系统不会存储任何个人隐私数据</span>
-        </div>
       </div>
     </div>
   );

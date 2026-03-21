@@ -41,20 +41,27 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
   if (!isActive) return null;
 
   const stepIndex = step ? PROGRESS_ORDER.indexOf(step) : 0;
+  const t = { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } as const;
 
-  // 深度思考模式：背景高斯模糊 + 弹框毛玻璃 + 阴影
+  // 深度思考模式：背景高斯模糊 + 弹框毛玻璃 + 阴影（仅淡入，无淡出）
   if (enableThinking) {
     return (
-      <div
+      <motion.div
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={t}
         style={{
           backgroundColor: "rgba(248, 250, 252, 0.6)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
         }}
       >
-        <div
+        <motion.div
           className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={t}
           style={{
             backdropFilter: "blur(24px) saturate(150%)",
             backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -106,23 +113,29 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
               <span className="text-sm font-mono">推理中...</span>
             </div>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   }
 
-  // 普通模式：背景高斯模糊 + 弹框毛玻璃 + 阴影
+  // 普通模式：背景高斯模糊 + 弹框毛玻璃 + 阴影（仅淡入，无淡出）
   return (
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={t}
       style={{
         backgroundColor: "rgba(248, 250, 252, 0.6)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
       }}
     >
-      <div
+      <motion.div
         className="w-full max-w-md overflow-hidden rounded-2xl px-8 py-10"
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={t}
         style={{
           backdropFilter: "blur(24px) saturate(150%)",
           backgroundColor: "rgba(255, 255, 255, 0.72)",
@@ -188,7 +201,7 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
             );
           })}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { InputStep } from "@/components/InputStep";
@@ -197,15 +198,35 @@ export default function Home() {
       <Header onOpenApiKey={() => setApiKeyDialogOpen(true)} />
       <main className="flex-1 px-6 pt-[35px] pb-12">
         <div className="mx-auto flex max-w-6xl justify-center">
-          {result ? (
-            <ResultDashboard result={result} onBack={handleBack} />
-          ) : (
-            <InputStep
-              onAnalyze={handleAnalyze}
-              isLoading={isLoading}
-              onProgressStep={setProgressStep}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {result ? (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="w-full"
+              >
+                <ResultDashboard result={result} onBack={handleBack} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="w-full"
+              >
+                <InputStep
+                  onAnalyze={handleAnalyze}
+                  isLoading={isLoading}
+                  onProgressStep={setProgressStep}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
       <Footer />

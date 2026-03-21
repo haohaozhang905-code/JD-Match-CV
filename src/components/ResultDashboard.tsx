@@ -43,7 +43,7 @@ export function ResultDashboard({ result, onBack }: ResultDashboardProps) {
   const cardShadow = "0px 8px 30px 0px rgba(0,0,0,0.04)";
 
   return (
-    <div className="w-full max-w-4xl space-y-8">
+    <div className="mx-auto w-full max-w-4xl space-y-8">
       {/* 顶部操作栏 */}
       <div className="flex h-[38px] items-center justify-between px-0 print:hidden">
         <Button
