@@ -19,7 +19,7 @@ function sleep(ms: number) {
 function getRateLimitKey(request: NextRequest): string {
   // 优先使用 X-Forwarded-For，否则使用 IP
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0].trim() : request.ip || "unknown";
+  const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
   return ip;
 }
 
