@@ -17,9 +17,22 @@ interface LoadingOverlayProps {
 
 export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }: LoadingOverlayProps) {
   const thinkingRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
 
   useEffect(() => {
-    if (thinkingText && thinkingRef.current) {
+    if (!enableThinking || !isActive) return;
+    const el = thinkingRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+      autoScrollRef.current = atBottom;
+    };
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [enableThinking, isActive]);
+
+  useEffect(() => {
+    if (thinkingText && thinkingRef.current && autoScrollRef.current) {
       thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
     }
   }, [thinkingText]);

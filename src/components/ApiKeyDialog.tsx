@@ -12,17 +12,19 @@ const THINKING_MODE_KEY = "jd-match-cv-thinking-mode";
 
 export function getStoredApiKey(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem(STORAGE_KEY) || "";
+  // 优先使用 sessionStorage（更安全），关闭浏览器后自动清除
+  return sessionStorage.getItem(STORAGE_KEY) || "";
 }
 
 export function setStoredApiKey(key: string) {
   if (typeof window === "undefined") return;
-  if (key) localStorage.setItem(STORAGE_KEY, key);
-  else localStorage.removeItem(STORAGE_KEY);
+  if (key) sessionStorage.setItem(STORAGE_KEY, key);
+  else sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function getStoredThinkingMode(): boolean {
   if (typeof window === "undefined") return true;
+  // 思考模式使用 localStorage，因为不是敏感信息
   const stored = localStorage.getItem(THINKING_MODE_KEY);
   return stored === null ? true : stored === "true";
 }
@@ -102,6 +104,8 @@ export function ApiKeyDialog({ open, onOpenChange, onSave }: ApiKeyDialogProps) 
                 「阿里云百炼大模型平台」
               </a>
               申请 <strong className="font-semibold text-[#101828]">「API Key（北京）」</strong> 并填写即可使用。
+              <br />
+              <span className="text-xs text-[#9ca3af]">注：API Key 仅保存在当前浏览器会话中，关闭浏览器后自动清除。</span>
             </p>
             <input
               type="password"

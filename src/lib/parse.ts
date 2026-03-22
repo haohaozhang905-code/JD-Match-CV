@@ -11,11 +11,37 @@ export const LIMITS = {
   resume: RESUME_MAX_SIZE,
 } as const;
 
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "image/jpeg",
+  "image/png",
+  // 有些系统可能返回空的 MIME type，通过扩展名判断
+  "",
+];
+
 export function validateFileSize(file: File, type: "jd" | "resume"): string | null {
   const max = type === "jd" ? JD_MAX_SIZE : RESUME_MAX_SIZE;
   const maxMB = type === "jd" ? 5 : 10;
   if (file.size > max) {
     return `文件大小超过 ${maxMB}MB 限制`;
+  }
+  return null;
+}
+
+export function validateFileType(file: File): string | null {
+  // 如果 MIME type 为空，通过扩展名判断
+  if (!file.type) {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const validExts = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
+    if (ext && validExts.includes(ext)) {
+      return null;
+    }
+  }
+
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    return `不支持的文件类型: ${file.type || "未知"}`;
   }
   return null;
 }
@@ -99,6 +125,9 @@ export async function parseFile(
 ): Promise<{ text: string; error?: string }> {
   const sizeError = validateFileSize(file, type);
   if (sizeError) return { text: "", error: sizeError };
+
+  const typeError = validateFileType(file);
+  if (typeError) return { text: "", error: typeError };
 
   const ext = file.name.split(".").pop()?.toLowerCase();
 

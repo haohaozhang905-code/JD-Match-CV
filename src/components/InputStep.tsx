@@ -12,6 +12,9 @@ import { parseFile } from "@/lib/parse";
 type JdInputMode = "paste" | "upload";
 type ResumeInputMode = "paste" | "upload";
 
+const MAX_TEXT_LENGTH = 10000; // 与后端保持一致
+const MAX_FILE_PARSED_LENGTH = 40000; // 文件解析后最大长度
+
 interface InputStepProps {
   onAnalyze: (getData: () => Promise<{ jd: string; resume: string }>) => void;
   isLoading: boolean;
@@ -37,6 +40,9 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
         onProgressStep?.("parsing_jd");
         const { text, error } = await parseFile(jdFile, "jd");
         if (error) throw new Error(`JD解析失败: ${error}`);
+        if (text.length > MAX_FILE_PARSED_LENGTH) {
+          throw new Error(`JD 文件内容过长（${text.length} 字符），最多支持 ${MAX_FILE_PARSED_LENGTH} 字符`);
+        }
         jd = text;
       }
 
@@ -45,6 +51,9 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
         onProgressStep?.("parsing_resume");
         const { text, error } = await parseFile(resumeFile, "resume");
         if (error) throw new Error(`简历解析失败: ${error}`);
+        if (text.length > MAX_FILE_PARSED_LENGTH) {
+          throw new Error(`简历文件内容过长（${text.length} 字符），最多支持 ${MAX_FILE_PARSED_LENGTH} 字符`);
+        }
         resume = text;
       }
 
@@ -103,12 +112,20 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
 
           {jdMode === "paste" ? (
             <div className="flex h-[250px] flex-shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50/50 focus-within:border-[#155dfc] focus-within:ring-2 focus-within:ring-[#155dfc]/30 focus-within:ring-offset-0">
-              <Textarea
-                placeholder="在此粘贴 Boss直聘、猎聘 等平台的职位描述详情..."
-                value={jdText}
-                onChange={(e) => setJdText(e.target.value)}
-                className="h-full min-h-0 resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 text-sm placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
+              <div className="flex-1 overflow-hidden">
+                <Textarea
+                  placeholder="在此粘贴 Boss直聘、猎聘 等平台的职位描述详情..."
+                  value={jdText}
+                  onChange={(e) => setJdText(e.target.value)}
+                  maxLength={MAX_TEXT_LENGTH}
+                  className="h-full w-full resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 text-sm placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-end px-4 pb-2">
+                <span className="text-xs text-[#9ca3af]">
+                  {jdText.length} / {MAX_TEXT_LENGTH}
+                </span>
+              </div>
             </div>
           ) : (
             <div className="flex h-[250px] flex-shrink-0 flex-col">
@@ -174,12 +191,20 @@ export function InputStep({ onAnalyze, isLoading, onProgressStep }: InputStepPro
 
           {resumeMode === "paste" ? (
             <div className="flex h-[250px] flex-shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50/50 focus-within:border-[#155dfc] focus-within:ring-2 focus-within:ring-[#155dfc]/30 focus-within:ring-offset-0">
-              <Textarea
-                placeholder="在此粘贴简历内容，可从 Word/PDF 复制..."
-                value={resumeText}
-                onChange={(e) => setResumeText(e.target.value)}
-                className="h-full min-h-0 resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 text-sm placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
+              <div className="flex-1 overflow-hidden">
+                <Textarea
+                  placeholder="在此粘贴简历内容，可从 Word/PDF 复制..."
+                  value={resumeText}
+                  onChange={(e) => setResumeText(e.target.value)}
+                  maxLength={MAX_TEXT_LENGTH}
+                  className="h-full w-full resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 text-sm placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
+              <div className="flex shrink-0 items-center justify-end px-4 pb-2">
+                <span className="text-xs text-[#9ca3af]">
+                  {resumeText.length} / {MAX_TEXT_LENGTH}
+                </span>
+              </div>
             </div>
           ) : (
             <div className="flex h-[250px] flex-shrink-0 flex-col">

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Upload } from "lucide-react";
-import { validateFileSize } from "@/lib/parse";
+import { validateFileSize, validateFileType } from "@/lib/parse";
 import { cn } from "@/lib/utils";
 
 interface FileDropZoneProps {
@@ -31,6 +31,11 @@ export function FileDropZone({
   const handleFile = useCallback(
     (file: File) => {
       setError(null);
+      const typeError = validateFileType(file);
+      if (typeError) {
+        setError(typeError);
+        return;
+      }
       const sizeError = validateFileSize(file, type);
       if (sizeError) {
         setError(sizeError);
