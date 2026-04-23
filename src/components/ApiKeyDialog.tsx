@@ -46,8 +46,11 @@ export function ApiKeyDialog({ open, onOpenChange, onSave }: ApiKeyDialogProps) 
 
   useEffect(() => {
     if (open) {
-      setKey(getStoredApiKey());
-      setEnableThinking(getStoredThinkingMode());
+      const id = window.setTimeout(() => {
+        setKey(getStoredApiKey());
+        setEnableThinking(getStoredThinkingMode());
+      }, 0);
+      return () => window.clearTimeout(id);
     }
   }, [open]);
 

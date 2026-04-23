@@ -13,11 +13,52 @@ interface LoadingOverlayProps {
   step?: ProgressStep | null;
   thinkingText?: string;
   enableThinking?: boolean;
+  pipelineSteps?: Array<{ step: string; data: Record<string, unknown> }>;
 }
 
-export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }: LoadingOverlayProps) {
+function renderPipelineStep(s: { step: string; data: Record<string, unknown> }): string {
+  switch (s.step) {
+    case "extracting_jd_meta": {
+      const { company, role } = s.data as { company?: string; role?: string };
+      return company || role ? `提取关键词：${[company, role].filter(Boolean).join(" / ")}` : "提取JD关键词";
+    }
+    case "searching_company":
+      return "搜索公司动态（已获取）";
+    case "searching_role":
+      return "搜索岗位行情（已获取）";
+    case "building_context": {
+      const len = (s.data as { contextLength?: number }).contextLength;
+      return `上下文构建完成${len ? `（${len}字符）` : ""}`;
+    }
+    default:
+      return s.step;
+  }
+}
+
+function PipelineStepsCompact({ steps }: { steps: Array<{ step: string; data: Record<string, unknown> }> }) {
+  if (!steps.length) return null;
+  return (
+    <div className="mb-4 space-y-1 border-b border-gray-100 pb-4">
+      {steps.map((s, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs text-[#6b7280]">
+          <Check className="size-3 shrink-0 text-[#22c55e]" strokeWidth={3} />
+          <span>{renderPipelineStep(s)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const MAX_DISPLAY_LENGTH = 5000;
+
+export function LoadingOverlay({ isActive, step, thinkingText, enableThinking, pipelineSteps = [] }: LoadingOverlayProps) {
   const thinkingRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+
+  // 只显示最后 5000 字符，避免渲染超长文本
+  const displayThinkingText = (thinkingText?.length ?? 0) > MAX_DISPLAY_LENGTH
+    ? thinkingText!.slice(-MAX_DISPLAY_LENGTH)
+    : thinkingText;
 
   useEffect(() => {
     if (!enableThinking || !isActive) return;
@@ -56,7 +97,6 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
   const stepIndex = step ? PROGRESS_ORDER.indexOf(step) : 0;
   const t = { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } as const;
 
-  // 深度思考模式：背景高斯模糊 + 弹框毛玻璃 + 阴影（仅淡入，无淡出）
   if (enableThinking) {
     return (
       <motion.div
@@ -71,7 +111,7 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
         }}
       >
         <motion.div
-          className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl"
+          className="flex w-full max-w-4xl flex-col overflow-hidden rounded-[16px]"
           initial={{ opacity: 0, scale: 0.96, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={t}
@@ -83,7 +123,6 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
               "0 0 0 1px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.05), 0 12px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.08)",
           }}
         >
-          {/* 头部 */}
           <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#eff6ff]">
@@ -95,14 +134,14 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
               </div>
             </div>
           </div>
-          {/* 思考过程 */}
           <div className="min-h-[280px] p-6">
-            <div
-              ref={thinkingRef}
-              className="max-h-[420px] overflow-y-auto overflow-x-hidden text-sm leading-[1.7] text-[#374151]"
-            >
-              {thinkingText ? (
+            <PipelineStepsCompact steps={pipelineSteps} />
+            <div ref={thinkingRef} className="max-h-[420px] overflow-y-auto overflow-x-hidden text-sm leading-[1.7] text-[#374151]">
+              {displayThinkingText ? (
                 <div className="font-mono break-words [&_strong]:font-semibold [&_strong]:text-[#101828] [&_em]:italic [&_ul]:list-disc [&_ul]:list-inside [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:my-1">
+                  {(thinkingText?.length ?? 0) > MAX_DISPLAY_LENGTH && (
+                    <p className="mb-2 text-xs text-[#9ca3af]">... (显示最后 {MAX_DISPLAY_LENGTH} 字符)</p>
+                  )}
                   <ReactMarkdown
                     remarkPlugins={[remarkBreaks]}
                     components={{
@@ -114,7 +153,7 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
                       li: ({ children }) => <li className="my-0.5">{children}</li>,
                     }}
                   >
-                    {thinkingText}
+                    {displayThinkingText}
                   </ReactMarkdown>
                 </div>
               ) : (
@@ -131,7 +170,6 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
     );
   }
 
-  // 普通模式：背景高斯模糊 + 弹框毛玻璃 + 阴影（仅淡入，无淡出）
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
@@ -145,7 +183,7 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
       }}
     >
       <motion.div
-        className="w-full max-w-md overflow-hidden rounded-2xl px-8 py-10"
+        className="w-full max-w-md overflow-hidden rounded-[16px] px-8 py-10"
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={t}
@@ -157,14 +195,13 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
             "0 0 0 1px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.05), 0 12px 24px rgba(0,0,0,0.1), 0 24px 48px rgba(0,0,0,0.08)",
         }}
       >
-        {/* 动态时间轴 */}
         <div className="space-y-0">
+          <PipelineStepsCompact steps={pipelineSteps} />
           {PROGRESS_ORDER.map((s, i) => {
             const status = i < stepIndex ? "completed" : i === stepIndex ? "active" : "pending";
             return (
               <div key={s} className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
-                  {/* 节点图标 */}
                   <div className="flex size-8 shrink-0 items-center justify-center">
                     {status === "completed" && (
                       <motion.div
@@ -181,11 +218,8 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
                         <Loader2 className="size-5 animate-spin text-[#3B82F6]" />
                       </div>
                     )}
-                    {status === "pending" && (
-                      <div className="size-2 rounded-full bg-gray-300 opacity-40" />
-                    )}
+                    {status === "pending" && <div className="size-2 rounded-full bg-gray-300 opacity-40" />}
                   </div>
-                  {/* 连接线 */}
                   {i < PROGRESS_ORDER.length - 1 && (
                     <div className="relative mt-1 h-8 w-px overflow-hidden bg-gray-200">
                       <motion.div
@@ -198,15 +232,7 @@ export function LoadingOverlay({ isActive, step, thinkingText, enableThinking }:
                   )}
                 </div>
                 <div className="flex min-h-8 flex-1 items-center">
-                  <p
-                    className={`m-0 text-sm leading-normal transition-colors ${
-                      status === "active"
-                        ? "font-medium text-[#111827]"
-                        : status === "completed"
-                          ? "text-[#6b7280]"
-                          : "text-gray-400"
-                    }`}
-                  >
+                  <p className={`m-0 text-sm leading-normal transition-colors ${status === "active" ? "font-medium text-[#111827]" : status === "completed" ? "text-[#6b7280]" : "text-gray-400"}`}>
                     {PROGRESS_LABELS[s]}
                   </p>
                 </div>
