@@ -31,21 +31,20 @@ export default function Home() {
   const [apiKey, setApiKey] = useState("");
   const [thinkingText, setThinkingText] = useState("");
   const [enableThinking, setEnableThinking] = useState(false);
+  const [pipelineSteps, setPipelineSteps] = useState<Array<{ step: string; data: Record<string, unknown> }>>([]);
   const loadingStartRef = useRef<number>(0);
 
   const handleAnalyze = useCallback(
     async (getData: () => Promise<{ jd: string; resume: string }>) => {
       const key = apiKey || getStoredApiKey();
-      if (!key) {
-        setApiKeyDialogOpen(true);
-        return;
-      }
+      // key 为空时走免费模式，不强制弹窗
 
       setIsLoading(true);
       loadingStartRef.current = Date.now();
       setProgressStep("parsing_jd");
       setResult(null);
       setThinkingText("");
+      setPipelineSteps([]);
       const thinkingMode = getStoredThinkingMode();
       setEnableThinking(thinkingMode);
 
@@ -68,6 +67,9 @@ export default function Home() {
           setProgressStep("parsing_resume");
           await new Promise((r) => setTimeout(r, 100));
 
+          setProgressStep("searching_company");
+          await new Promise((r) => setTimeout(r, 100));
+
           setProgressStep("analyzing_match");
 
           progressTimer = setInterval(() => {
@@ -78,6 +80,7 @@ export default function Home() {
             });
           }, 4000);
 
+          console.log("[FETCH] Sending enableThinking:", thinkingMode);
           const res = await fetch("/api/analyze-stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -97,6 +100,17 @@ export default function Home() {
         const decoder = new TextDecoder();
         let contentBuffer = "";
         let lineBuffer = "";
+        let thinkingBuffer = "";
+        const localPipelineSteps: Array<{ step: string; data: Record<string, unknown> }> = [];
+
+        let lastUpdateTime = Date.now();
+        const updateInterval = 100;
+
+        const flushUpdates = () => {
+          setPipelineSteps([...localPipelineSteps]);
+          setThinkingText(thinkingBuffer);
+          lastUpdateTime = Date.now();
+        };
 
         while (true) {
           const { done, value } = await reader.read();
@@ -109,9 +123,12 @@ export default function Home() {
             if (!line.trim()) continue;
             try {
               const parsed = JSON.parse(line);
-              if (parsed.type === "reasoning" && parsed.content) {
-                setThinkingText((prev) => prev + parsed.content);
-                await new Promise((r) => setTimeout(r, 0));
+              console.log("[STREAM]", parsed.type, parsed);
+              if (parsed.type === "step") {
+                localPipelineSteps.push({ step: parsed.step, data: parsed.data });
+              } else if (parsed.type === "reasoning" && parsed.content) {
+                console.log("[REASONING]", parsed.content.slice(0, 100));
+                thinkingBuffer += parsed.content;
               } else if (parsed.type === "content" && parsed.content) {
                 contentBuffer += parsed.content;
               }
@@ -119,13 +136,20 @@ export default function Home() {
               // 非 JSON 行，忽略
             }
           }
+
+          if (Date.now() - lastUpdateTime >= updateInterval) {
+            flushUpdates();
+          }
         }
 
         if (lineBuffer.trim()) {
           try {
             const parsed = JSON.parse(lineBuffer);
-            if (parsed.type === "reasoning" && parsed.content) {
-              setThinkingText((prev) => prev + parsed.content);
+            console.log("[STREAM-FINAL]", parsed.type, parsed);
+            if (parsed.type === "step") {
+              localPipelineSteps.push({ step: parsed.step, data: parsed.data });
+            } else if (parsed.type === "reasoning" && parsed.content) {
+              thinkingBuffer += parsed.content;
             } else if (parsed.type === "content" && parsed.content) {
               contentBuffer += parsed.content;
             }
@@ -133,6 +157,8 @@ export default function Home() {
             // 忽略
           }
         }
+
+        flushUpdates();
 
         // 提取 JSON：支持纯 JSON、或 ```json ... ``` 包裹
         let jsonStr = contentBuffer.trim();
@@ -159,7 +185,22 @@ export default function Home() {
             await new Promise((r) => setTimeout(r, remaining));
             setProgressStep("generating_questions");
             await new Promise((r) => setTimeout(r, 200));
-            setResult({ ...parsed, matchScore: score } as AnalysisResult);
+            console.log("[RESULT] thinkingText length:", thinkingBuffer.length, "pipelineSteps:", localPipelineSteps.length);
+
+            // 从 pipelineSteps 中提取市场洞察数据
+            const companyStep = localPipelineSteps.find(s => s.step === "searching_company");
+            const roleStep = localPipelineSteps.find(s => s.step === "searching_role");
+            const extraStep = localPipelineSteps.find(s => s.step === "searching_extra");
+            const summaryStep = localPipelineSteps.find(s => s.step === "summarizing_market");
+            const marketInsights = {
+              company: (companyStep?.data?.items as Array<{ title: string; content: string; url: string }>) ?? [],
+              role: (roleStep?.data?.items as Array<{ title: string; content: string; url: string }>) ?? [],
+              extra: (extraStep?.data?.items as Array<{ title: string; content: string; url: string }>) ?? [],
+            };
+            const marketInsightSummary = summaryStep?.data as { markdown?: string; sources?: Array<{ title: string; url: string }>; sections?: { company: string[]; role: string[]; process: string[]; prep: string[] } } | undefined;
+            const marketInsightSections = marketInsightSummary?.sections;
+
+            setResult({ ...parsed, matchScore: score, thinkingText: thinkingBuffer, pipelineSteps: localPipelineSteps, marketInsights, marketInsightSummary, marketInsightSections } as AnalysisResult);
             window.scrollTo(0, 0);
             break;
           } else {
@@ -179,12 +220,12 @@ export default function Home() {
 
       if (lastError) {
         alert(lastError instanceof Error ? lastError.message : "分析失败，请稍后重试");
+        setThinkingText("");
       }
       } finally {
         if (progressTimer) clearInterval(progressTimer);
         setIsLoading(false);
         setProgressStep(null);
-        setThinkingText("");
         setEnableThinking(false);
       }
     },
@@ -235,6 +276,7 @@ export default function Home() {
         step={progressStep}
         thinkingText={thinkingText}
         enableThinking={enableThinking}
+        pipelineSteps={pipelineSteps}
       />
       <ApiKeyDialog
         open={apiKeyDialogOpen}

@@ -14,11 +14,11 @@ export function useCountUp(
 
   useEffect(() => {
     if (!enabled || target === 0) {
-      setValue(target);
-      return;
+      const id = window.setTimeout(() => setValue(target), 0);
+      return () => window.clearTimeout(id);
     }
 
-    setValue(0);
+    const resetId = window.setTimeout(() => setValue(0), 0);
     const startTime = performance.now();
 
     const tick = (now: number) => {
@@ -34,7 +34,10 @@ export function useCountUp(
     };
 
     const id = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(id);
+    return () => {
+      window.clearTimeout(resetId);
+      cancelAnimationFrame(id);
+    };
   }, [target, duration, enabled]);
 
   return value;
